@@ -62,6 +62,7 @@ fn rerun_if_changed() {
         "CARGO_FEATURE_AVX2",
         "CARGO_FEATURE_NEON",
         "CARGO_CFG_TARGET_ARCH",
+        "CARGO_CFG_TARGET_ENV",
         "CARGO_CFG_TARGET_FEATURE",
         "CARGO_CFG_TARGET_VENDOR",
         "CARGO_CFG_UNIX",
@@ -125,6 +126,10 @@ fn has_target_feature(feature: &str) -> bool {
         .any(|target_feature| target_feature == feature)
 }
 
+fn msvc() -> bool {
+    env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc")
+}
+
 fn build_mayo_c(source_dir: &Path, build_dir: &Path, backend: Backend) {
     reset_cmake_build_dir(build_dir);
 
@@ -139,6 +144,14 @@ fn build_mayo_c(source_dir: &Path, build_dir: &Path, backend: Backend) {
         .arg("-DENABLE_STRICT=OFF")
         .arg("-DCMAKE_BUILD_TYPE=Release")
         .arg(format!("-DMAYO_BUILD_TYPE={}", backend.name()));
+
+    if msvc() {
+        // MAYO-C sets CMAKE_C_STANDARD to 99 with a plain set(), which shadows a
+        // -DCMAKE_C_STANDARD cache override. MSVC has no C99 mode, so CMake emits no
+        // /std flag and <stdalign.h> does not define `alignas` in legacy C mode.
+        // Force C17 through CMAKE_C_FLAGS instead.
+        cmake.arg("-DCMAKE_C_FLAGS=/std:c17");
+    }
 
     configure_cmake_backend(&mut cmake, backend);
     run(&mut cmake);
@@ -186,7 +199,9 @@ fn build_bridge(source_dir: &Path, bridge_source: &Path, out_dir: &Path, backend
         let mut build = cc::Build::new();
         build
             .file(&wrapper)
-            .std("c99")
+            // The bridge includes mayo.c, which uses `alignas` from <stdalign.h>.
+            // MSVC only provides it from C11, so C99 is reserved for other compilers.
+            .std(if msvc() { "c17" } else { "c99" })
             .warnings(false)
             .opt_level(3)
             .flag_if_supported("-funroll-loops")
@@ -273,6 +288,13 @@ fn link_static_libraries(build_dir: &Path) {
     println!(
         "cargo:rustc-link-search=native={}",
         build_dir.join("src").display()
+    );
+
+    // Multi-config CMake generators (Visual Studio on Windows) place outputs in a
+    // per-config subdirectory instead of src itself.
+    println!(
+        "cargo:rustc-link-search=native={}",
+        build_dir.join("src").join("Release").display()
     );
 
     for library in STATIC_LIBRARIES {
