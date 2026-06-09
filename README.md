@@ -26,9 +26,8 @@ assert!(signature.verify(&public_key, message));
 
 ## Benchmarks
 
-Criterion benchmarks from `cargo bench` on `aarch64-apple-darwin` with rustc
-1.96.0. No backend feature was selected, so the build script auto-detected the
-NEON backend.
+Criterion benchmarks from `cargo bench` on `aarch64-apple-darwin` (Apple M4 Max 2024)
+with rustc `1.96.0` and `neon` enabled.
 
 | Parameter set | Keygen | Sign | Verify | Verify 128 | Batch add + verify 128 |
 | --- | ---: | ---: | ---: | ---: | ---: |
