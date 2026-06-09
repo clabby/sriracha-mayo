@@ -18,8 +18,14 @@ default = [ "std" ]
 opt = []
 avx2 = []
 neon = []
-serde = [ "bytes/serde", "dep:serde", "zeroize/serde" ]
-std = [ "bytes/std", "serde?/std", "thiserror/std", "zeroize/std" ]
+serde = [ "bytes/serde", "dep:serde", "rand_core/serde", "zeroize/serde" ]
+std = [
+	"bytes/std",
+	"rand_core/std",
+	"serde?/std",
+	"thiserror/std",
+	"zeroize/std",
+]
 
 [dependencies]
 bytes = { version = "1", default-features = false }
