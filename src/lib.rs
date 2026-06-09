@@ -205,16 +205,32 @@ mod tests {
     #[test]
     fn concrete_public_types_expose_derived_traits() {
         fn assert_public_traits<T: Debug + Eq + PartialEq>() {}
+        fn assert_secret_key_traits<T: Clone>() {}
         fn assert_parameter_set<P: ParameterSet + Debug + Eq + PartialEq>() {
             assert_public_traits::<P>();
             assert_public_traits::<PublicKey<P>>();
             assert_public_traits::<Signature<P>>();
+            assert_secret_key_traits::<SecretKey<P>>();
         }
 
         assert_parameter_set::<Mayo1>();
         assert_parameter_set::<Mayo2>();
         assert_parameter_set::<Mayo3>();
         assert_parameter_set::<Mayo5>();
+    }
+
+    #[test]
+    fn cloned_secret_keys_keep_the_same_seed() {
+        run_on_large_stack(|| {
+            let mut rng = ChaCha20Rng::from_seed([12; 32]);
+            let (public_key, secret_key) = SecretKey::<Mayo3>::random(&mut rng).unwrap();
+            let cloned_secret_key = secret_key.clone();
+            let message = b"cloned signer";
+            let signature = cloned_secret_key.sign(message).unwrap();
+
+            assert_eq!(secret_key.as_ref(), cloned_secret_key.as_ref());
+            assert!(signature.verify(&public_key, message));
+        });
     }
 
     #[cfg(feature = "serde")]

@@ -32,6 +32,15 @@ pub struct SecretKey<P: ParameterSet> {
     parameter_set: PhantomData<P>,
 }
 
+impl<P: ParameterSet> Clone for SecretKey<P> {
+    fn clone(&self) -> Self {
+        Self {
+            bytes: self.bytes.clone(),
+            parameter_set: PhantomData,
+        }
+    }
+}
+
 impl<P: ParameterSet> SecretKey<P> {
     /// Derives a keypair from a compact secret-key seed.
     ///
