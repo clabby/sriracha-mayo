@@ -6,7 +6,7 @@ use crate::{
 };
 use bytes::BytesMut;
 use core::{marker::PhantomData, mem::MaybeUninit};
-use rand_core::{CryptoRng, Rng};
+use rand_core::CryptoRngCore;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// A compact MAYO secret key.
@@ -63,7 +63,7 @@ impl<P: ParameterSet> SecretKey<P> {
     /// ```
     pub fn random<R>(rng: &mut R) -> Result<(PublicKey<P>, Self), Error>
     where
-        R: Rng + CryptoRng,
+        R: CryptoRngCore,
     {
         let mut public_key = BytesMut::zeroed(P::PUBLIC_KEY_BYTES);
         let mut secret_key = BytesMut::zeroed(P::SECRET_KEY_BYTES);
