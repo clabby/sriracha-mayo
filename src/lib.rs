@@ -170,6 +170,33 @@ mod tests {
     }
 
     #[test]
+    fn keypairs_can_be_derived_from_secret_key_seeds() {
+        run_on_large_stack(|| {
+            let seed = [11; Mayo5::SECRET_KEY_BYTES];
+            let (public_key, secret_key) = SecretKey::<Mayo5>::from_seed(&seed).unwrap();
+            let (same_public_key, same_secret_key) = SecretKey::<Mayo5>::from_seed(&seed).unwrap();
+            let message = b"seeded constructor";
+            let signature = secret_key.sign(message).unwrap();
+
+            assert_eq!(secret_key.as_ref(), seed);
+            assert_eq!(same_secret_key.as_ref(), seed);
+            assert_eq!(public_key, same_public_key);
+            assert!(signature.verify(&public_key, message));
+        });
+    }
+
+    #[test]
+    fn seeded_keypair_derivation_rejects_wrong_lengths() {
+        assert!(matches!(
+            SecretKey::<Mayo1>::from_seed(&[]),
+            Err(Error::InvalidLength {
+                expected: Mayo1::SECRET_KEY_BYTES,
+                actual: 0,
+            })
+        ));
+    }
+
+    #[test]
     fn binds_mayo_error_codes() {
         assert_eq!(MayoError::MayoErr.code(), 1);
         assert_eq!(MayoError::Unknown(7).code(), 7);

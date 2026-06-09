@@ -33,6 +33,48 @@ pub struct SecretKey<P: ParameterSet> {
 }
 
 impl<P: ParameterSet> SecretKey<P> {
+    /// Derives a keypair from a compact secret-key seed.
+    ///
+    /// MAYO compact secret keys are seeds. MAYO-C derives the matching compact
+    /// public key deterministically from that seed, so this constructor returns
+    /// both halves and prevents callers from pairing mismatched key bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidLength`] if `seed` does not have the exact
+    /// secret-key length for `P`. Returns [`Error::KeyGeneration`] if MAYO-C
+    /// fails to derive the matching public key.
+    pub fn from_seed(seed: &[u8]) -> Result<(PublicKey<P>, Self), Error> {
+        expect_len(P::SECRET_KEY_BYTES, seed.len())?;
+
+        let mut public_key = BytesMut::zeroed(P::PUBLIC_KEY_BYTES);
+        let mut secret_key = BytesMut::from(seed);
+
+        // SAFETY: The secret-key buffer has the exact seed length required by
+        // `P`, and the public-key output buffer is allocated to `P`'s compact
+        // public-key size. MAYO-C does not retain either pointer.
+        let result = unsafe {
+            <P as private::Sealed>::SEEDED_KEYPAIR(public_key.as_mut_ptr(), secret_key.as_ptr())
+        };
+        if result != 0 {
+            secret_key.zeroize();
+            return Err(Error::KeyGeneration {
+                error: MayoError::from_code(result),
+            });
+        }
+
+        Ok((
+            PublicKey {
+                bytes: public_key.freeze(),
+                parameter_set: PhantomData,
+            },
+            Self {
+                bytes: secret_key,
+                parameter_set: PhantomData,
+            },
+        ))
+    }
+
     /// Generates a keypair using caller-provided randomness.
     ///
     /// The RNG fills MAYO's compact secret-key seed. MAYO-C derives the
@@ -65,34 +107,11 @@ impl<P: ParameterSet> SecretKey<P> {
     where
         R: CryptoRngCore,
     {
-        let mut public_key = BytesMut::zeroed(P::PUBLIC_KEY_BYTES);
         let mut secret_key = BytesMut::zeroed(P::SECRET_KEY_BYTES);
 
         rng.fill_bytes(&mut secret_key);
 
-        // SAFETY: The secret-key buffer has the exact seed length required by
-        // `P`, and the public-key output buffer is allocated to `P`'s compact
-        // public-key size. MAYO-C does not retain either pointer.
-        let result = unsafe {
-            <P as private::Sealed>::SEEDED_KEYPAIR(public_key.as_mut_ptr(), secret_key.as_ptr())
-        };
-        if result != 0 {
-            secret_key.zeroize();
-            return Err(Error::KeyGeneration {
-                error: MayoError::from_code(result),
-            });
-        }
-
-        Ok((
-            PublicKey {
-                bytes: public_key.freeze(),
-                parameter_set: PhantomData,
-            },
-            Self {
-                bytes: secret_key,
-                parameter_set: PhantomData,
-            },
-        ))
+        Self::from_seed(&secret_key)
     }
 
     /// Signs `message` and returns a detached signature.
