@@ -185,10 +185,7 @@ impl<P: ParameterSet> ExpandedPublicKey<P> {
         // constructed with `P`'s public-key size. MAYO-C does not retain either
         // pointer.
         let result = unsafe {
-            <P as private::Sealed>::EXPAND_PUBLIC_KEY(
-                words.as_mut_ptr(),
-                public_key.bytes.as_ptr(),
-            )
+            <P as private::Sealed>::EXPAND_PUBLIC_KEY(words.as_mut_ptr(), public_key.bytes.as_ptr())
         };
         if result != 0 {
             return Err(Error::PublicKeyExpansion {
