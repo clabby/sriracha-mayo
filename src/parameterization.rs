@@ -68,7 +68,7 @@ macro_rules! parameter_set {
         impl private::Sealed for $type {
             const SEEDED_KEYPAIR: unsafe extern "C" fn(*mut u8, *const u8) -> i32 =
                 externs::$seeded_keypair;
-            type ExpandedPublicKeyWords = [u64; $expanded_public_key_words];
+            const EXPANDED_PUBLIC_KEY_WORDS: usize = $expanded_public_key_words;
             const EXPAND_PUBLIC_KEY: unsafe extern "C" fn(*mut u64, *const u8) -> i32 =
                 externs::$expand_public_key;
             const SIGN: unsafe extern "C" fn(
@@ -159,7 +159,7 @@ parameter_set!(
 pub(crate) mod private {
     pub trait Sealed {
         const SEEDED_KEYPAIR: unsafe extern "C" fn(*mut u8, *const u8) -> i32;
-        type ExpandedPublicKeyWords: ExpandedPublicKeyWords;
+        const EXPANDED_PUBLIC_KEY_WORDS: usize;
         const EXPAND_PUBLIC_KEY: unsafe extern "C" fn(*mut u64, *const u8) -> i32;
         const SIGN: unsafe extern "C" fn(*mut u8, *mut usize, *const u8, usize, *const u8) -> i32;
         const VERIFY: unsafe extern "C" fn(*const u8, usize, *const u8, usize, *const u8) -> i32;
@@ -172,13 +172,4 @@ pub(crate) mod private {
         ) -> i32;
     }
 
-    pub trait ExpandedPublicKeyWords: AsMut<[u64]> + AsRef<[u64]> {
-        fn zeroed() -> Self;
-    }
-
-    impl<const N: usize> ExpandedPublicKeyWords for [u64; N] {
-        fn zeroed() -> Self {
-            [0; N]
-        }
-    }
 }

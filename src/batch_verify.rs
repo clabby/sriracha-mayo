@@ -1,13 +1,10 @@
 use crate::{
     errors::{Error, MayoError},
-    parameterization::{
-        ParameterSet,
-        private::{self, ExpandedPublicKeyWords},
-    },
+    parameterization::{ParameterSet, private},
     public_key::PublicKey,
     signature::Signature,
 };
-use alloc::{collections::BTreeMap, vec, vec::Vec};
+use alloc::{boxed::Box, collections::BTreeMap, vec, vec::Vec};
 use bytes::Bytes;
 use core::{fmt, marker::PhantomData};
 
@@ -175,13 +172,13 @@ struct QueuedVerification<P: ParameterSet> {
 }
 
 struct ExpandedPublicKey<P: ParameterSet> {
-    words: <P as private::Sealed>::ExpandedPublicKeyWords,
+    words: Box<[u64]>,
     parameter_set: PhantomData<P>,
 }
 
 impl<P: ParameterSet> ExpandedPublicKey<P> {
     fn new(public_key: &PublicKey<P>) -> Result<Self, Error> {
-        let mut words = <P as private::Sealed>::ExpandedPublicKeyWords::zeroed();
+        let mut words = vec![0; P::EXPANDED_PUBLIC_KEY_WORDS].into_boxed_slice();
 
         // SAFETY: The expanded-key buffer is allocated with `u64` alignment and
         // the exact number of words required by `P`. The compact public key was
@@ -189,7 +186,7 @@ impl<P: ParameterSet> ExpandedPublicKey<P> {
         // pointer.
         let result = unsafe {
             <P as private::Sealed>::EXPAND_PUBLIC_KEY(
-                words.as_mut().as_mut_ptr(),
+                words.as_mut_ptr(),
                 public_key.bytes.as_ptr(),
             )
         };
@@ -216,10 +213,22 @@ impl<P: ParameterSet> ExpandedPublicKey<P> {
                 signature.bytes.len(),
                 message.as_ptr(),
                 message.len(),
-                self.words.as_ref().as_ptr(),
+                self.words.as_ptr(),
             )
         };
 
         result == 0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Mayo5;
+    use core::mem::size_of;
+
+    #[test]
+    fn expanded_public_key_handle_stays_small() {
+        assert!(size_of::<ExpandedPublicKey<Mayo5>>() <= 32);
     }
 }
